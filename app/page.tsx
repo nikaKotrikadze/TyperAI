@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const [userInput, setUserInput] = useState("");
@@ -9,8 +9,44 @@ export default function Home() {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [wpm, setWpm] = useState(0);
 
-  const targetText =
-    "Hello, it's me. I was wondering if after all these years you'd like to meet. To go over everything. They say that time's supposed to heal ya, but I ain't done much healing.";
+  // Inside your Home component:
+  const [targetText, setTargetText] = useState(
+    "Loading your first challenge...",
+  );
+  const [topic, setTopic] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Function to fetch the AI text
+  const fetchAiText = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        body: JSON.stringify({ topic }),
+      });
+
+      // MENTOR TIP: Always check if the response is OK before calling .json()
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setTargetText(data.text);
+      resetGame();
+    } catch (error) {
+      console.error("AI Fetch Error:", error);
+      setTargetText(
+        "AI is taking a break. Please check your API key or model name.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // Use an effect to load the first text on page load
+  useEffect(() => {
+    fetchAiText();
+  }, []);
+
   const words = targetText.split(" ");
   const isFinished = activeWordIndex === words.length;
 
@@ -76,6 +112,23 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
               {wpm} <span className="text-xs text-zinc-400">WPM</span>
+            </div>
+            {/* Place this above your main text box */}
+            <div className="flex gap-2 w-full">
+              <input
+                type="text"
+                placeholder="Enter a topic (e.g. Space, Cooking, Coding)..."
+                className="flex-1 p-3 rounded-lg border dark:bg-zinc-900 dark:border-zinc-800 outline-none focus:ring-2 focus:ring-blue-500"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+              />
+              <button
+                onClick={fetchAiText}
+                disabled={isLoading}
+                className="bg-zinc-900 dark:bg-zinc-100 dark:text-black text-white px-6 rounded-lg font-bold disabled:opacity-50"
+              >
+                {isLoading ? "Generating..." : "Generate Text"}
+              </button>
             </div>
             {isFinished && (
               <button
