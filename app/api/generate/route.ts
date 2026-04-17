@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
     const { text } = await generateText({
       model: google("models/gemini-2.5-flash"),
-      prompt: `Generate a single paragraph for a typing race about: ${topic}. 25 words max. No intro.`,
+      prompt: `Quickly generate a single paragraph for a typing race about (how to appreciate yourself first and then the {topic}): ${topic}. 25 words max. No intro.`,
     });
 
     return Response.json({ text: text.trim() });

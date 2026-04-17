@@ -61,46 +61,65 @@ export default function Home() {
   // 1. Monitor every single character for the "Final Finish"
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-
-    // Start timer on first character
     if (!startTime && val.length > 0) setStartTime(Date.now());
 
-    // Check if we are on the LAST word
     if (activeWordIndex === words.length - 1) {
       if (val === words[activeWordIndex]) {
-        // MATCH! The last word is typed perfectly.
-        setCorrectWords([...correctWords, true]);
+        // Correct last word!
+        const updatedCorrectWords = [...correctWords, true];
+        setCorrectWords(updatedCorrectWords);
         setActiveWordIndex(activeWordIndex + 1);
         setUserInput(val);
-        calculateWpm(activeWordIndex + 1);
-        return; // Exit early so we don't set input to the "completed" string
+
+        // Calculate using the updated array
+        const timeElapsed = (Date.now() - startTime!) / 60000;
+        setWpm(
+          Math.round(updatedCorrectWords.filter(Boolean).length / timeElapsed),
+        );
+        return;
       }
     }
-
     setUserInput(val);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === " ") {
-      // If user hits space on the last word, we don't want it to clear
-      // unless they've actually finished it (but our onChange handles that now)
       if (activeWordIndex < words.length - 1) {
         e.preventDefault();
-        const currentWord = words[activeWordIndex];
-        const isCorrect = userInput.trim() === currentWord;
+        const isCorrect = userInput.trim() === words[activeWordIndex];
 
-        setCorrectWords([...correctWords, isCorrect]);
+        const updatedCorrectWords = [...correctWords, isCorrect];
+        setCorrectWords(updatedCorrectWords);
         setActiveWordIndex(activeWordIndex + 1);
         setUserInput("");
-        calculateWpm(activeWordIndex + 1);
+
+        // Update WPM based on the correct words only
+        const timeElapsed = (Date.now() - startTime!) / 60000;
+        setWpm(
+          Math.round(updatedCorrectWords.filter(Boolean).length / timeElapsed),
+        );
       }
     }
   };
 
-  const calculateWpm = (currentWordCount: number) => {
+  const calculateWpm = () => {
     if (!startTime) return;
-    const timeElapsed = (Date.now() - startTime) / 60000;
-    setWpm(Math.round(currentWordCount / timeElapsed));
+
+    const timeElapsed = (Date.now() - startTime) / 60000; // Time in minutes
+
+    // MENTOR TIP: Only count words where the user got it right!
+    const totalCorrectWords = correctWords.filter(
+      (isCorrect) => isCorrect,
+    ).length;
+
+    // If the user just finished the very last word, we add 1 if it was correct
+    // because that last word hasn't been pushed to the array yet in some logic flows
+    const finalCount = isFinished ? totalCorrectWords : totalCorrectWords;
+
+    if (timeElapsed > 0) {
+      const currentWpm = Math.round(totalCorrectWords / timeElapsed);
+      setWpm(currentWpm);
+    }
   };
 
   return (
