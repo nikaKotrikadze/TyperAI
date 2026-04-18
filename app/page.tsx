@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Navbar from "./components/Navbar";
 
 export default function Home() {
   const [userInput, setUserInput] = useState("");
@@ -102,46 +103,47 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4 transition-all duration-500">
-      {/* We use a wrapper that allows the content to dictate height */}
-      <div className="w-full max-w-3xl flex flex-col gap-6">
-        <div className="flex justify-between items-end">
-          <h1 className="text-4xl font-bold tracking-tighter">TyperAI</h1>
-          <div className="flex items-center gap-4">
-            <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
-              {wpm} <span className="text-xs text-zinc-400">WPM</span>
+    <main className="relative">
+      <div className="flex flex-col min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4 transition-all duration-500">
+        {/* We use a wrapper that allows the content to dictate height */}
+        <div className="w-full max-w-3xl flex flex-col gap-6">
+          <div className="flex justify-between items-end">
+            <h1 className="text-4xl font-bold tracking-tighter">TyperAI</h1>
+            <div className="flex items-center gap-4">
+              <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
+                {wpm} <span className="text-xs text-zinc-400">WPM</span>
+              </div>
+              {/* Place this above your main text box */}
+              <div className="flex gap-2 w-full">
+                <input
+                  type="text"
+                  placeholder="Enter a topic (e.g. Space, Cooking, Coding)..."
+                  className="flex-1 p-3 rounded-lg border dark:bg-zinc-900 dark:border-zinc-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                />
+                <button
+                  onClick={fetchAiText}
+                  disabled={isLoading}
+                  className="bg-zinc-900 dark:bg-zinc-100 dark:text-black text-white px-6 rounded-lg font-bold disabled:opacity-50"
+                >
+                  {isLoading ? "Generating..." : "Generate Text"}
+                </button>
+              </div>
+              {isFinished && (
+                <button
+                  onClick={resetGame}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-bold transition-transform hover:scale-105"
+                >
+                  Race Again 🏁
+                </button>
+              )}
             </div>
-            {/* Place this above your main text box */}
-            <div className="flex gap-2 w-full">
-              <input
-                type="text"
-                placeholder="Enter a topic (e.g. Space, Cooking, Coding)..."
-                className="flex-1 p-3 rounded-lg border dark:bg-zinc-900 dark:border-zinc-800 outline-none focus:ring-2 focus:ring-blue-500"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-              />
-              <button
-                onClick={fetchAiText}
-                disabled={isLoading}
-                className="bg-zinc-900 dark:bg-zinc-100 dark:text-black text-white px-6 rounded-lg font-bold disabled:opacity-50"
-              >
-                {isLoading ? "Generating..." : "Generate Text"}
-              </button>
-            </div>
-            {isFinished && (
-              <button
-                onClick={resetGame}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-bold transition-transform hover:scale-105"
-              >
-                Race Again 🏁
-              </button>
-            )}
           </div>
-        </div>
 
-        {/* THE STRETCHING BOX */}
-        <div
-          className="
+          {/* THE STRETCHING BOX */}
+          <div
+            className="
         w-full 
         h-auto 
         min-h-[150px] 
@@ -161,45 +163,48 @@ export default function Home() {
         ease-in-out
         overflow-hidden
       "
-        >
-          <div className="flex flex-wrap">
-            {words.map((word, wIdx) => {
-              let color = "text-zinc-400";
-              if (wIdx < activeWordIndex) {
-                color = correctWords[wIdx] ? "text-green-500" : "text-red-500";
-              } else if (wIdx === activeWordIndex) {
-                color =
-                  "text-blue-500 underline underline-offset-8 decoration-2";
-              }
-              return (
-                <span
-                  key={wIdx}
-                  className={`${color} mr-3 mb-2 transition-colors`}
-                >
-                  {word}
-                </span>
-              );
-            })}
+          >
+            <div className="flex flex-wrap">
+              {words.map((word, wIdx) => {
+                let color = "text-zinc-400";
+                if (wIdx < activeWordIndex) {
+                  color = correctWords[wIdx]
+                    ? "text-green-500"
+                    : "text-red-500";
+                } else if (wIdx === activeWordIndex) {
+                  color =
+                    "text-blue-500 underline underline-offset-8 decoration-2";
+                }
+                return (
+                  <span
+                    key={wIdx}
+                    className={`${color} mr-3 mb-2 transition-colors`}
+                  >
+                    {word}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {!isFinished && (
-          <div className="space-y-2">
-            <input
-              type="text"
-              className="w-full text-xl p-5 rounded-xl border-2 border-zinc-200 focus:border-blue-500 outline-none dark:bg-zinc-900 dark:border-zinc-800 shadow-inner transition-all"
-              value={userInput}
-              onKeyDown={handleKeyDown}
-              onChange={handleInputChange}
-              placeholder="Type exactly what you see above..."
-              autoFocus
-            />
-            <p className="text-xs text-zinc-400 text-center italic">
-              Tip: Pressing Space locks in the word. Accuracy counts!
-            </p>
-          </div>
-        )}
+          {!isFinished && (
+            <div className="space-y-2">
+              <input
+                type="text"
+                className="w-full text-xl p-5 rounded-xl border-2 border-zinc-200 focus:border-blue-500 outline-none dark:bg-zinc-900 dark:border-zinc-800 shadow-inner transition-all"
+                value={userInput}
+                onKeyDown={handleKeyDown}
+                onChange={handleInputChange}
+                placeholder="Type exactly what you see above..."
+                autoFocus
+              />
+              <p className="text-xs text-zinc-400 text-center italic">
+                Tip: Pressing Space locks in the word. Accuracy counts!
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
