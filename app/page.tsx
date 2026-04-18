@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Navbar from "./components/Navbar";
 
 export default function Home() {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [userInput, setUserInput] = useState("");
   const [activeWordIndex, setActiveWordIndex] = useState(0);
   const [correctWords, setCorrectWords] = useState<boolean[]>([]);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [finalTime, setFinalTime] = useState<number | null>(null);
   const [wpm, setWpm] = useState(0);
 
   // Inside your Home component:
@@ -50,29 +52,35 @@ export default function Home() {
 
   const words = targetText.split(" ");
   const isFinished = activeWordIndex === words.length;
-
   const resetGame = () => {
     setUserInput("");
     setActiveWordIndex(0);
     setCorrectWords([]);
     setStartTime(null);
     setWpm(0);
+    setFinalTime(null); // Clear the time for the next round
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (!startTime && val.length > 0) setStartTime(Date.now());
 
+    // Check if we are on the last word
     if (activeWordIndex === words.length - 1) {
       if (val === words[activeWordIndex]) {
-        // Correct last word!
+        const endTime = Date.now(); // Capture the finish moment
         const updatedCorrectWords = [...correctWords, true];
+
         setCorrectWords(updatedCorrectWords);
         setActiveWordIndex(activeWordIndex + 1);
         setUserInput(val);
 
-        // Calculate using the updated array
-        const timeElapsed = (Date.now() - startTime!) / 60000;
+        // 1. Calculate Total Seconds
+        const totalSeconds = ((endTime - startTime!) / 1000).toFixed(2);
+        setFinalTime(Number(totalSeconds));
+
+        // 2. Calculate WPM
+        const timeElapsed = (endTime - startTime!) / 60000;
         setWpm(
           Math.round(updatedCorrectWords.filter(Boolean).length / timeElapsed),
         );
@@ -102,6 +110,13 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    if (!isLoading && !isFinished) {
+      // This tells the browser: "Find the input and click it for the user"
+      inputRef.current?.focus();
+    }
+  }, [isLoading, isFinished]);
+
   return (
     <main className="relative">
       <div className="flex flex-col min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4 transition-all duration-500">
@@ -113,6 +128,7 @@ export default function Home() {
               <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
                 {wpm} <span className="text-xs text-zinc-400">WPM</span>
               </div>
+
               {/* Place this above your main text box */}
               <div className="flex gap-2 w-full">
                 <input
@@ -186,15 +202,22 @@ export default function Home() {
               })}
             </div>
           </div>
-
+          {finalTime !== null && (
+            <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
+              {finalTime !== null ? finalTime : 0}{" "}
+              <span className="text-xs text-zinc-400">Seconds</span>
+            </div>
+          )}
           {!isFinished && (
             <div className="space-y-2">
               <input
+                ref={inputRef}
                 type="text"
                 className="w-full text-xl p-5 rounded-xl border-2 border-zinc-200 focus:border-blue-500 outline-none dark:bg-zinc-900 dark:border-zinc-800 shadow-inner transition-all"
                 value={userInput}
                 onKeyDown={handleKeyDown}
                 onChange={handleInputChange}
+                disabled={isLoading || isFinished}
                 placeholder="Type exactly what you see above..."
                 autoFocus
               />
