@@ -58,7 +58,6 @@ export default function Home() {
     setWpm(0);
   };
 
-  // 1. Monitor every single character for the "Final Finish"
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (!startTime && val.length > 0) setStartTime(Date.now());
@@ -99,26 +98,6 @@ export default function Home() {
           Math.round(updatedCorrectWords.filter(Boolean).length / timeElapsed),
         );
       }
-    }
-  };
-
-  const calculateWpm = () => {
-    if (!startTime) return;
-
-    const timeElapsed = (Date.now() - startTime) / 60000; // Time in minutes
-
-    // MENTOR TIP: Only count words where the user got it right!
-    const totalCorrectWords = correctWords.filter(
-      (isCorrect) => isCorrect,
-    ).length;
-
-    // If the user just finished the very last word, we add 1 if it was correct
-    // because that last word hasn't been pushed to the array yet in some logic flows
-    const finalCount = isFinished ? totalCorrectWords : totalCorrectWords;
-
-    if (timeElapsed > 0) {
-      const currentWpm = Math.round(totalCorrectWords / timeElapsed);
-      setWpm(currentWpm);
     }
   };
 
