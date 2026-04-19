@@ -10,6 +10,8 @@ interface UserState {
   loading: boolean;
   initialize: () => void;
   setTargetText: (text: string) => void; // New action
+  topic: string;
+  setTopic: (topic: string) => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
@@ -17,7 +19,8 @@ export const useUserStore = create<UserState>((set) => ({
   userData: { username: "", bestWpm: 0 },
   targetText: "", // Start empty
   loading: true,
-
+  topic: "",
+  setTopic: (topic) => set({ topic }),
   setTargetText: (text) => set({ targetText: text }),
 
   initialize: () => {

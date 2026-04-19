@@ -1,102 +1,96 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import Navbar from "./components/Navbar";
-import { auth, db } from "@/lib/firebase"; // Import auth and db
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 import Link from "next/link";
+import { useUserStore } from "@/lib/useUserStore";
 
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    user,
+    userData,
+    targetText,
+    setTargetText,
+    topic,
+    setTopic,
+    loading,
+  } = useUserStore();
+
   const [userInput, setUserInput] = useState("");
   const [activeWordIndex, setActiveWordIndex] = useState(0);
-  const [correctWords, setCorrectWords] = useState<boolean[]>([]);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [finalTime, setFinalTime] = useState<number | null>(null);
   const [wpm, setWpm] = useState(0);
-  const [targetText, setTargetText] = useState(
-    "Loading your first challenge...",
-  );
-  const [topic, setTopic] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  const words = targetText.split(" ");
-  const isFinished = activeWordIndex === words.length;
-
   const [highlightCTA, setHighlightCTA] = useState(false);
-  // EFFECT: Handle Database Update on Finish
+
+  const words = targetText ? targetText.split(" ") : [];
+  const isFinished = words.length > 0 && activeWordIndex === words.length;
+
+  // 1. Initial Fetch & Auto-Refresh on Finish
   useEffect(() => {
-    const saveProgress = async () => {
-      const currentUser = auth.currentUser;
+    if (!targetText && !isLoading) {
+      fetchAiText();
+    }
+  }, [targetText]);
 
-      // Only attempt to save if the race is finished and a user is signed in
-      if (isFinished && currentUser && wpm > 0) {
-        try {
-          const userRef = doc(db, "users", currentUser.uid);
-          const userDoc = await getDoc(userRef);
-
-          if (userDoc.exists()) {
-            const currentBest = userDoc.data().bestWpm || 0;
-
-            // Only update if the new WPM is higher than the personal best
-            if (wpm > currentBest) {
-              await updateDoc(userRef, {
-                bestWpm: wpm,
-              });
-              console.log("New high score saved!");
-            }
+  // 2. High Score and Auto-Next-Race
+  useEffect(() => {
+    if (isFinished) {
+      const handleFinish = async () => {
+        // Save score if user is logged in
+        if (user && wpm > userData.bestWpm) {
+          try {
+            const userRef = doc(db, "users", user.uid);
+            await updateDoc(userRef, { bestWpm: wpm });
+          } catch (error) {
+            console.error(error);
           }
-        } catch (error) {
-          console.error("Error saving progress:", error);
         }
-      }
-    };
 
-    saveProgress();
-  }, [isFinished, wpm]); // Triggers when the race finishes
+        // Trigger CTA for guests
+        if (!user) {
+          setHighlightCTA(true);
+          setTimeout(() => setHighlightCTA(false), 1500);
+        }
+
+        // Auto-load new text after a small delay so they can see their score
+        setTimeout(() => {
+          setTargetText(""); // Clearing targetText triggers the fetch effect above
+        }, 2000);
+      };
+
+      handleFinish();
+    }
+  }, [isFinished]);
+
+  useEffect(() => {
+    if (!isLoading && !isFinished && targetText) inputRef.current?.focus();
+  }, [isLoading, isFinished, targetText]);
 
   const fetchAiText = async () => {
     setIsLoading(true);
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
-        body: JSON.stringify({ topic }),
+        body: JSON.stringify({ topic: topic || "" }),
       });
-      if (!response.ok) throw new Error(`Server error: ${response.status}`);
       const data = await response.json();
       setTargetText(data.text);
       resetGame();
     } catch (error) {
-      console.error("AI Fetch Error:", error);
       setTargetText("AI is taking a break. Please check your API key.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchAiText();
-  }, []);
-
-  useEffect(() => {
-    if (!isLoading && !isFinished) {
-      inputRef.current?.focus();
-    }
-  }, [isLoading, isFinished]);
-
-  useEffect(() => {
-    if (isFinished && !auth.currentUser) {
-      setHighlightCTA(true);
-      // Remove the class after the animation finishes so it can trigger again if they race again
-      const timer = setTimeout(() => setHighlightCTA(false), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [isFinished]);
-
   const resetGame = () => {
     setUserInput("");
     setActiveWordIndex(0);
-    setCorrectWords([]);
     setStartTime(null);
     setWpm(0);
     setFinalTime(null);
@@ -106,166 +100,137 @@ export default function Home() {
     const val = e.target.value;
     if (!startTime && val.length > 0) setStartTime(Date.now());
 
-    if (activeWordIndex === words.length - 1) {
-      if (val === words[activeWordIndex]) {
-        const endTime = Date.now();
-        const updatedCorrectWords = [...correctWords, true];
-        setCorrectWords(updatedCorrectWords);
-        setActiveWordIndex(activeWordIndex + 1);
-        setUserInput(val);
+    const currentWord = words[activeWordIndex];
 
-        const totalSeconds = ((endTime - startTime!) / 1000).toFixed(2);
-        setFinalTime(Number(totalSeconds));
-
-        const timeElapsed = (endTime - startTime!) / 60000;
-        const finalWpm = Math.round(
-          updatedCorrectWords.filter(Boolean).length / timeElapsed,
-        );
-        setWpm(finalWpm);
-        return;
-      }
+    // Check if user finished the last word
+    if (activeWordIndex === words.length - 1 && val === currentWord) {
+      const endTime = Date.now();
+      setActiveWordIndex(activeWordIndex + 1);
+      setUserInput(val);
+      setFinalTime(Number(((endTime - startTime!) / 1000).toFixed(2)));
+      calculateWpm(activeWordIndex + 1, endTime);
+      return;
     }
+
     setUserInput(val);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === " ") {
-      if (activeWordIndex < words.length - 1) {
+      const currentWord = words[activeWordIndex];
+      if (userInput === currentWord) {
         e.preventDefault();
-        const isCorrect = userInput.trim() === words[activeWordIndex];
-        const updatedCorrectWords = [...correctWords, isCorrect];
-        setCorrectWords(updatedCorrectWords);
         setActiveWordIndex(activeWordIndex + 1);
         setUserInput("");
-
-        const timeElapsed = (Date.now() - startTime!) / 60000;
-        setWpm(
-          Math.round(updatedCorrectWords.filter(Boolean).length / timeElapsed),
-        );
+        calculateWpm(activeWordIndex + 1, Date.now());
       }
     }
   };
 
-  useEffect(() => {
-    if (!isLoading && !isFinished) {
-      // This tells the browser: "Find the input and click it for the user"
-      inputRef.current?.focus();
-    }
-  }, [isLoading, isFinished]);
+  const calculateWpm = (wordCount: number, endTime: number) => {
+    if (!startTime) return;
+    const timeElapsed = (endTime - startTime) / 60000;
+    setWpm(Math.round(wordCount / timeElapsed));
+  };
 
-  const createAccountLink = () => {
-    if (auth.currentUser) return null;
+  const renderWord = (word: string, index: number) => {
+    const isCurrentWord = index === activeWordIndex;
+    const isPastWord = index < activeWordIndex;
 
     return (
-      <div
-        className={`w-full max-w-4xl px-10 py-6 mb-12 flex justify-between items-center rounded-2xl border transition-all duration-700 bg-zinc-950/50 backdrop-blur-sm 
-      ${highlightCTA ? "animate-led border-white" : "border-zinc-800"} 
-`}
-      >
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold tracking-tight text-white">
-            Record your races with a TyperAI Account!
-          </h2>
-          <p className="text-sm text-zinc-500">
-            Save your race history and scores. It&apos;s free.
-          </p>
-        </div>
-
-        <Link
-          href="/sign-up"
-          className="px-6 py-3 bg-white text-black text-sm font-bold rounded-lg transition hover:bg-zinc-200 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-        >
-          Create an Account
-        </Link>
-      </div>
+      <span key={index} className="mr-3 mb-2 transition-colors relative">
+        {word.split("").map((char, charIdx) => {
+          let color = "text-zinc-600";
+          if (isPastWord) color = "text-green-500";
+          else if (isCurrentWord) {
+            if (charIdx < userInput.length) {
+              color =
+                char === userInput[charIdx]
+                  ? "text-green-500"
+                  : "text-red-500 bg-red-900/30";
+            }
+          }
+          return (
+            <span
+              key={charIdx}
+              className={`${color} transition-colors duration-75`}
+            >
+              {char}
+            </span>
+          );
+        })}
+        {isCurrentWord && (
+          <span className="absolute left-0 -bottom-1 w-full h-[2px] bg-blue-500" />
+        )}
+      </span>
     );
   };
 
   return (
-    <main className="relative">
-      <div className="flex flex-col min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4 transition-all duration-500">
-        {createAccountLink()}
-        {/* We use a wrapper that allows the content to dictate height */}
-        <div className="w-full max-w-3xl flex flex-col gap-6">
-          <div className="flex justify-between items-end">
-            <h1 className="text-4xl font-bold tracking-tighter">TyperAI</h1>
-            <div className="flex items-center gap-4">
-              <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
-                {wpm} <span className="text-xs text-zinc-400">WPM</span>
-              </div>
+    <main className="relative min-h-screen bg-black flex flex-col items-center justify-center p-4">
+      {/* Account Banner */}
+      <div className="w-full max-w-4xl h-[120px] flex items-center justify-center">
+        {!user && !loading && !isLoading && (
+          <div
+            className={`w-full px-10 py-6 flex justify-between items-center rounded-2xl border transition-all duration-700 bg-zinc-950/50 backdrop-blur-sm ${highlightCTA ? "animate-led border-white" : "border-zinc-800"}`}
+          >
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold text-white">
+                Record your races with a TyperAI Account!
+              </h2>
+              <p className="text-sm text-zinc-500">
+                Save history and scores for free.
+              </p>
+            </div>
+            <Link
+              href="/sign-up"
+              className="px-6 py-3 bg-white text-black text-sm font-bold rounded-lg hover:bg-zinc-200"
+            >
+              Create Account
+            </Link>
+          </div>
+        )}
+      </div>
 
-              {/* Place this above your main text box */}
-              <div className="flex gap-2 w-full">
-                <input
-                  type="text"
-                  placeholder="Enter a topic (e.g. Space, Cooking, Coding)..."
-                  className="flex-1 p-3 rounded-lg border dark:bg-zinc-900 dark:border-zinc-800 outline-none focus:ring-2 focus:ring-blue-500"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                />
-                <button
-                  onClick={fetchAiText}
-                  disabled={isLoading}
-                  className="bg-zinc-900 dark:bg-zinc-100 dark:text-black text-white px-6 rounded-lg font-bold disabled:opacity-50"
-                >
-                  {isLoading ? "Generating..." : "Generate Text"}
-                </button>
-              </div>
-              {isFinished && (
-                <button
-                  onClick={resetGame}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-bold transition-transform hover:scale-105"
-                >
-                  Race Again 🏁
-                </button>
-              )}
+      <div className="w-full max-w-3xl flex flex-col gap-6">
+        <div className="flex justify-between items-end">
+          <h1 className="text-4xl font-bold tracking-tighter text-white">
+            TyperAI
+          </h1>
+          {topic && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-full animate-in fade-in slide-in-from-left-2 duration-500">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+              <span className="text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest">
+                {topic}
+              </span>
+            </div>
+          )}
+          <div className="flex items-center gap-4">
+            <div className="text-2xl font-mono text-blue-500 bg-blue-900/20 px-3 py-1 rounded-lg border border-blue-800">
+              {wpm} <span className="text-xs text-zinc-400">WPM</span>
             </div>
           </div>
 
-          {/* THE STRETCHING BOX */}
-          <div
-            className="
-        w-full 
-        h-auto 
-        min-h-[150px] 
-        text-2xl 
-        leading-relaxed 
-        font-mono 
-        bg-white 
-        dark:bg-zinc-900 
-        p-8 
-        rounded-2xl 
-        border-2 
-        border-zinc-200 
-        dark:border-zinc-800 
-        shadow-xl 
-        transition-all 
-        duration-300 
-        ease-in-out
-        overflow-hidden
-      "
-          >
-            <div className="flex flex-wrap">
-              {words.map((word, wIdx) => {
-                let color = "text-zinc-400";
-                if (wIdx < activeWordIndex) {
-                  color = correctWords[wIdx]
-                    ? "text-green-500"
-                    : "text-red-500";
-                } else if (wIdx === activeWordIndex) {
-                  color =
-                    "text-blue-500 underline underline-offset-8 decoration-2";
-                }
-                return (
-                  <span
-                    key={wIdx}
-                    className={`${color} mr-3 mb-2 transition-colors`}
-                  >
-                    {word}
-                  </span>
-                );
-              })}
+        {/* RACING BOX */}
+        <div className="relative w-full min-h-[160px] text-2xl leading-relaxed font-mono bg-zinc-900 p-8 rounded-2xl border-2 border-zinc-800 shadow-xl overflow-hidden">
+          {isLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 backdrop-blur-sm z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-zinc-400 text-lg">
+                  AI is generating your challenge...
+                </span>
+              </div>
             </div>
+          ) : null}
+
+          <div
+            className={`flex flex-wrap ${isLoading ? "opacity-20" : "opacity-100"} transition-opacity duration-500`}
+          >
+            {words.map((word, i) => renderWord(word, i))}
           </div>
           {finalTime !== null && (
             <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
@@ -292,6 +257,25 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {isFinished && (
+          <div className="text-center animate-pulse text-blue-400 font-mono">
+            Race complete! Loading next challenge...
+          </div>
+        )}
+
+        <input
+          ref={inputRef}
+          type="text"
+          className="w-full text-xl p-5 rounded-xl border-2 border-zinc-800 bg-zinc-900 text-white focus:border-blue-500 outline-none transition-all disabled:opacity-50"
+          value={userInput}
+          onKeyDown={handleKeyDown}
+          onChange={handleInputChange}
+          disabled={isLoading || isFinished}
+          placeholder={
+            isLoading ? "Please wait..." : "Type exactly what you see above..."
+          }
+        />
       </div>
     </main>
   );
