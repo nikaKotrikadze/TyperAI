@@ -213,7 +213,6 @@ export default function Home() {
               {wpm} <span className="text-xs text-zinc-400">WPM</span>
             </div>
           </div>
-        </div>
 
         {/* RACING BOX */}
         <div className="relative w-full min-h-[160px] text-2xl leading-relaxed font-mono bg-zinc-900 p-8 rounded-2xl border-2 border-zinc-800 shadow-xl overflow-hidden">
@@ -233,6 +232,30 @@ export default function Home() {
           >
             {words.map((word, i) => renderWord(word, i))}
           </div>
+          {finalTime !== null && (
+            <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
+              {finalTime !== null ? finalTime : 0}{" "}
+              <span className="text-xs text-zinc-400">Seconds</span>
+            </div>
+          )}
+          {!isFinished && (
+            <div className="space-y-2">
+              <input
+                ref={inputRef}
+                type="text"
+                className="w-full text-xl p-5 rounded-xl border-2 border-zinc-200 focus:border-blue-500 outline-none dark:bg-zinc-900 dark:border-zinc-800 shadow-inner transition-all"
+                value={userInput}
+                onKeyDown={handleKeyDown}
+                onChange={handleInputChange}
+                disabled={isLoading || isFinished}
+                placeholder="Type exactly what you see above..."
+                autoFocus
+              />
+              <p className="text-xs text-zinc-400 text-center italic">
+                Tip: Pressing Space locks in the word. Accuracy counts!
+              </p>
+            </div>
+          )}
         </div>
 
         {isFinished && (
