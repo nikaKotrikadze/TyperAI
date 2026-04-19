@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useRef } from "react";
 import Navbar from "./components/Navbar";
+import { auth, db } from "@/lib/firebase"; // Import auth and db
+import { doc, updateDoc, getDoc } from "firebase/firestore";
+import Link from "next/link";
 
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -11,15 +14,47 @@ export default function Home() {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [finalTime, setFinalTime] = useState<number | null>(null);
   const [wpm, setWpm] = useState(0);
-
-  // Inside your Home component:
   const [targetText, setTargetText] = useState(
     "Loading your first challenge...",
   );
   const [topic, setTopic] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Function to fetch the AI text
+  const words = targetText.split(" ");
+  const isFinished = activeWordIndex === words.length;
+
+  const [highlightCTA, setHighlightCTA] = useState(false);
+  // EFFECT: Handle Database Update on Finish
+  useEffect(() => {
+    const saveProgress = async () => {
+      const currentUser = auth.currentUser;
+
+      // Only attempt to save if the race is finished and a user is signed in
+      if (isFinished && currentUser && wpm > 0) {
+        try {
+          const userRef = doc(db, "users", currentUser.uid);
+          const userDoc = await getDoc(userRef);
+
+          if (userDoc.exists()) {
+            const currentBest = userDoc.data().bestWpm || 0;
+
+            // Only update if the new WPM is higher than the personal best
+            if (wpm > currentBest) {
+              await updateDoc(userRef, {
+                bestWpm: wpm,
+              });
+              console.log("New high score saved!");
+            }
+          }
+        } catch (error) {
+          console.error("Error saving progress:", error);
+        }
+      }
+    };
+
+    saveProgress();
+  }, [isFinished, wpm]); // Triggers when the race finishes
+
   const fetchAiText = async () => {
     setIsLoading(true);
     try {
@@ -27,63 +62,66 @@ export default function Home() {
         method: "POST",
         body: JSON.stringify({ topic }),
       });
-
-      // MENTOR TIP: Always check if the response is OK before calling .json()
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
       const data = await response.json();
       setTargetText(data.text);
       resetGame();
     } catch (error) {
       console.error("AI Fetch Error:", error);
-      setTargetText(
-        "AI is taking a break. Please check your API key or model name.",
-      );
+      setTargetText("AI is taking a break. Please check your API key.");
     } finally {
       setIsLoading(false);
     }
   };
-  // Use an effect to load the first text on page load
+
   useEffect(() => {
     fetchAiText();
   }, []);
 
-  const words = targetText.split(" ");
-  const isFinished = activeWordIndex === words.length;
+  useEffect(() => {
+    if (!isLoading && !isFinished) {
+      inputRef.current?.focus();
+    }
+  }, [isLoading, isFinished]);
+
+  useEffect(() => {
+    if (isFinished && !auth.currentUser) {
+      setHighlightCTA(true);
+      // Remove the class after the animation finishes so it can trigger again if they race again
+      const timer = setTimeout(() => setHighlightCTA(false), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isFinished]);
+
   const resetGame = () => {
     setUserInput("");
     setActiveWordIndex(0);
     setCorrectWords([]);
     setStartTime(null);
     setWpm(0);
-    setFinalTime(null); // Clear the time for the next round
+    setFinalTime(null);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (!startTime && val.length > 0) setStartTime(Date.now());
 
-    // Check if we are on the last word
     if (activeWordIndex === words.length - 1) {
       if (val === words[activeWordIndex]) {
-        const endTime = Date.now(); // Capture the finish moment
+        const endTime = Date.now();
         const updatedCorrectWords = [...correctWords, true];
-
         setCorrectWords(updatedCorrectWords);
         setActiveWordIndex(activeWordIndex + 1);
         setUserInput(val);
 
-        // 1. Calculate Total Seconds
         const totalSeconds = ((endTime - startTime!) / 1000).toFixed(2);
         setFinalTime(Number(totalSeconds));
 
-        // 2. Calculate WPM
         const timeElapsed = (endTime - startTime!) / 60000;
-        setWpm(
-          Math.round(updatedCorrectWords.filter(Boolean).length / timeElapsed),
+        const finalWpm = Math.round(
+          updatedCorrectWords.filter(Boolean).length / timeElapsed,
         );
+        setWpm(finalWpm);
         return;
       }
     }
@@ -95,13 +133,11 @@ export default function Home() {
       if (activeWordIndex < words.length - 1) {
         e.preventDefault();
         const isCorrect = userInput.trim() === words[activeWordIndex];
-
         const updatedCorrectWords = [...correctWords, isCorrect];
         setCorrectWords(updatedCorrectWords);
         setActiveWordIndex(activeWordIndex + 1);
         setUserInput("");
 
-        // Update WPM based on the correct words only
         const timeElapsed = (Date.now() - startTime!) / 60000;
         setWpm(
           Math.round(updatedCorrectWords.filter(Boolean).length / timeElapsed),
@@ -117,9 +153,38 @@ export default function Home() {
     }
   }, [isLoading, isFinished]);
 
+  const createAccountLink = () => {
+    if (auth.currentUser) return null;
+
+    return (
+      <div
+        className={`w-full max-w-4xl px-10 py-6 mb-12 flex justify-between items-center rounded-2xl border transition-all duration-700 bg-zinc-950/50 backdrop-blur-sm 
+      ${highlightCTA ? "animate-led border-white" : "border-zinc-800"} 
+`}
+      >
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold tracking-tight text-white">
+            Record your races with a TyperAI Account!
+          </h2>
+          <p className="text-sm text-zinc-500">
+            Save your race history and scores. It&apos;s free.
+          </p>
+        </div>
+
+        <Link
+          href="/sign-up"
+          className="px-6 py-3 bg-white text-black text-sm font-bold rounded-lg transition hover:bg-zinc-200 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+        >
+          Create an Account
+        </Link>
+      </div>
+    );
+  };
+
   return (
     <main className="relative">
       <div className="flex flex-col min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4 transition-all duration-500">
+        {createAccountLink()}
         {/* We use a wrapper that allows the content to dictate height */}
         <div className="w-full max-w-3xl flex flex-col gap-6">
           <div className="flex justify-between items-end">

@@ -11,9 +11,11 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.64",
     "ai": "^6.0.168",
+    "firebase": "^12.12.0",
     "next": "16.2.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
