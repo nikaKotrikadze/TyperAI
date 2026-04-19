@@ -194,26 +194,29 @@ export default function Home() {
 
       <div className="w-full max-w-3xl flex flex-col gap-6">
         <div className="flex justify-between items-end">
-          <h1 className="text-4xl font-bold tracking-tighter text-white">
-            TyperAI
-          </h1>
-          {topic && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-full animate-in fade-in slide-in-from-left-2 duration-500">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-              <span className="text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest">
-                {topic}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            <h1 className="text-4xl font-bold tracking-tighter text-white">
+              TyperAI
+            </h1>
+            {topic && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-full animate-in fade-in slide-in-from-left-2 duration-500">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </span>
+                <span className="text-xs font-mono font-bold text-zinc-400 uppercase tracking-widest">
+                  {topic}
+                </span>
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <div className="text-2xl font-mono text-blue-500 bg-blue-900/20 px-3 py-1 rounded-lg border border-blue-800">
               {wpm} <span className="text-xs text-zinc-400">WPM</span>
             </div>
           </div>
-
+        </div>{" "}
+        {/* <--- THIS WAS MISSING: Closes the Header Div */}
         {/* RACING BOX */}
         <div className="relative w-full min-h-[160px] text-2xl leading-relaxed font-mono bg-zinc-900 p-8 rounded-2xl border-2 border-zinc-800 shadow-xl overflow-hidden">
           {isLoading ? (
@@ -232,38 +235,17 @@ export default function Home() {
           >
             {words.map((word, i) => renderWord(word, i))}
           </div>
-          {finalTime !== null && (
-            <div className="text-2xl font-mono text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
-              {finalTime !== null ? finalTime : 0}{" "}
-              <span className="text-xs text-zinc-400">Seconds</span>
-            </div>
-          )}
-          {!isFinished && (
-            <div className="space-y-2">
-              <input
-                ref={inputRef}
-                type="text"
-                className="w-full text-xl p-5 rounded-xl border-2 border-zinc-200 focus:border-blue-500 outline-none dark:bg-zinc-900 dark:border-zinc-800 shadow-inner transition-all"
-                value={userInput}
-                onKeyDown={handleKeyDown}
-                onChange={handleInputChange}
-                disabled={isLoading || isFinished}
-                placeholder="Type exactly what you see above..."
-                autoFocus
-              />
-              <p className="text-xs text-zinc-400 text-center italic">
-                Tip: Pressing Space locks in the word. Accuracy counts!
-              </p>
-            </div>
-          )}
         </div>
-
+        {finalTime !== null && (
+          <div className="text-2xl font-mono text-blue-500 bg-blue-900/20 px-3 py-1 rounded-lg w-fit self-center">
+            {finalTime} <span className="text-xs text-zinc-400">Seconds</span>
+          </div>
+        )}
         {isFinished && (
           <div className="text-center animate-pulse text-blue-400 font-mono">
             Race complete! Loading next challenge...
           </div>
         )}
-
         <input
           ref={inputRef}
           type="text"
