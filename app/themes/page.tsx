@@ -7,21 +7,31 @@ import { useUserStore } from "@/lib/useUserStore";
 const THEMES = [
   {
     name: "Music",
+    bio: "Race with lyrics and stories about your favorite tunes and artists!",
     emoji: "🎵",
     subcategories: ["Hip-Hop", "R&B", "Rock", "Jazz", "Classical"],
   },
   {
     name: "Languages",
+    bio: "Test your typing skills with texts in different languages!",
     emoji: "🌐",
-    subcategories: ["English", "Georgian", "Spanish", "French", "Japanese"],
+    subcategories: [
+      "English Language",
+      "Georgian Language (ქართული)",
+      "Spanish Language (Español)",
+      "French Language (Français)",
+      "Japanese Language (日本語)",
+    ],
   },
   {
     name: "Poetry",
+    bio: "Challenge your typing speed with beautiful poems from around the world!",
     emoji: "✍️",
     subcategories: ["Romanticism", "Haiku", "Sonnets", "Modern Verse"],
   },
   {
     name: "Culture",
+    bio: "Explore the rich tapestry of global cultures through interactive races!",
     emoji: "🏮",
     subcategories: ["Mythology", "Culinary Arts", "History", "Architecture"],
   },
@@ -62,7 +72,9 @@ export default function ThemesPage() {
                 <span className="text-4xl">{theme.emoji}</span>
                 <h2 className="text-2xl font-bold text-white">{theme.name}</h2>
               </div>
-
+              <div>
+                <p className="text-zinc-500">{theme.bio}</p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {theme.subcategories.map((sub) => (
                   <button
