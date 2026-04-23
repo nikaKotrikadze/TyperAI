@@ -7,9 +7,15 @@ import { useUserStore } from "@/lib/useUserStore";
 const THEMES = [
   {
     name: "Music",
-    bio: "Race with lyrics and stories about your favorite tunes and artists!",
+    bio: "Get ready to race through the world of music with genre-themed typing challenges!",
     emoji: "🎵",
-    subcategories: ["Hip-Hop", "R&B", "Rock", "Jazz", "Classical"],
+    subcategories: [
+      "90s Boom Bap Hip-Hop",
+      "Modern R&B Lyrics",
+      "Classic 70s Rock",
+      "Synth-Pop Lyrics",
+      "Delta Blues",
+    ],
   },
   {
     name: "Languages",
@@ -25,15 +31,26 @@ const THEMES = [
   },
   {
     name: "Poetry",
-    bio: "Challenge your typing speed with beautiful poems from around the world!",
+    bio: "Immerse yourself in the beauty of words with poetry races!",
     emoji: "✍️",
-    subcategories: ["Romanticism", "Haiku", "Sonnets", "Modern Verse"],
+    subcategories: [
+      "Short Poem about Nature",
+      "Shakespearian Sonnet excerpt",
+      "Modern Abstract Poetry",
+      "Haiku Style Verse",
+    ],
   },
   {
     name: "Culture",
-    bio: "Explore the rich tapestry of global cultures through interactive races!",
+    bio: "Dive into the rich tapestry of world culture with these themed typing challenges!",
     emoji: "🏮",
-    subcategories: ["Mythology", "Culinary Arts", "History", "Architecture"],
+    subcategories: [
+      "Greek Mythology",
+      "Traditional Culinary Arts",
+      "Ancient History Moments",
+      "Architectural Wonders",
+      "World Folklore",
+    ],
   },
 ];
 

@@ -8,14 +8,16 @@ import { useUserStore } from "@/lib/useUserStore";
 
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isFetchingRef = useRef(false); // Prevents double-fetching
 
   const {
     user,
     userData,
     targetText,
     setTargetText,
+    sourceText,
+    setSourceText,
     topic,
-    setTopic,
     loading,
   } = useUserStore();
 
@@ -30,61 +32,44 @@ export default function Home() {
   const words = targetText ? targetText.split(" ") : [];
   const isFinished = words.length > 0 && activeWordIndex === words.length;
 
-  // 1. Initial Fetch & Auto-Refresh on Finish
+  // 1. Initial Fetch only - No dependency on targetText to avoid loops
   useEffect(() => {
-    if (!targetText && !isLoading) {
+    if (!targetText && !isLoading && !isFetchingRef.current) {
       fetchAiText();
     }
-  }, [targetText]);
+  }, []);
 
-  // 2. High Score and Auto-Next-Race
+  // 2. Focus Management
   useEffect(() => {
-    if (isFinished) {
-      const handleFinish = async () => {
-        // Save score if user is logged in
-        if (user && wpm > userData.bestWpm) {
-          try {
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, { bestWpm: wpm });
-          } catch (error) {
-            console.error(error);
-          }
-        }
-
-        // Trigger CTA for guests
-        if (!user) {
-          setHighlightCTA(true);
-          setTimeout(() => setHighlightCTA(false), 1500);
-        }
-
-        // Auto-load new text after a small delay so they can see their score
-        setTimeout(() => {
-          setTargetText(""); // Clearing targetText triggers the fetch effect above
-        }, 2000);
-      };
-
-      handleFinish();
+    if (!isLoading && !isFinished && targetText) {
+      inputRef.current?.focus();
     }
-  }, [isFinished]);
-
-  useEffect(() => {
-    if (!isLoading && !isFinished && targetText) inputRef.current?.focus();
   }, [isLoading, isFinished, targetText]);
 
   const fetchAiText = async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setIsLoading(true);
+
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
         body: JSON.stringify({ topic: topic || "" }),
       });
+
+      if (!response.ok) throw new Error("AI Busy");
+
       const data = await response.json();
       setTargetText(data.text);
+      setSourceText(data.source);
       resetGame();
     } catch (error) {
-      setTargetText("AI is taking a break. Please check your API key.");
+      setTargetText(
+        "AI is currently overwhelmed. Please try again in a few seconds.",
+      );
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -96,19 +81,55 @@ export default function Home() {
     setFinalTime(null);
   };
 
+  const handleFinish = async (finalWpm: number) => {
+    // Save score if logged in
+    if (user && finalWpm > (userData?.bestWpm || 0)) {
+      try {
+        const userRef = doc(db, "users", user.uid);
+        await updateDoc(userRef, { bestWpm: finalWpm });
+      } catch (error) {
+        console.error("Score Save Error:", error);
+      }
+    }
+
+    // Guest Highlight
+    if (!user) {
+      setHighlightCTA(true);
+      setTimeout(() => setHighlightCTA(false), 1500);
+    }
+
+    // Auto-load next race after delay
+    setTimeout(() => {
+      fetchAiText();
+    }, 2500);
+  };
+
+  const calculateWpm = (wordCount: number, endTime: number) => {
+    if (!startTime) return 0;
+    const timeElapsed = (endTime - startTime) / 60000;
+    const calculated = Math.round(wordCount / timeElapsed);
+    setWpm(calculated);
+    return calculated;
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isFinished || isLoading) return;
+
     const val = e.target.value;
     if (!startTime && val.length > 0) setStartTime(Date.now());
 
     const currentWord = words[activeWordIndex];
 
-    // Check if user finished the last word
+    // Detect completion of the final word
     if (activeWordIndex === words.length - 1 && val === currentWord) {
       const endTime = Date.now();
+      const finalWpm = calculateWpm(activeWordIndex + 1, endTime);
+
       setActiveWordIndex(activeWordIndex + 1);
       setUserInput(val);
       setFinalTime(Number(((endTime - startTime!) / 1000).toFixed(2)));
-      calculateWpm(activeWordIndex + 1, endTime);
+
+      handleFinish(finalWpm);
       return;
     }
 
@@ -127,18 +148,15 @@ export default function Home() {
     }
   };
 
-  const calculateWpm = (wordCount: number, endTime: number) => {
-    if (!startTime) return;
-    const timeElapsed = (endTime - startTime) / 60000;
-    setWpm(Math.round(wordCount / timeElapsed));
-  };
-
   const renderWord = (word: string, index: number) => {
     const isCurrentWord = index === activeWordIndex;
     const isPastWord = index < activeWordIndex;
 
     return (
-      <span key={index} className="mr-3 mb-2 transition-colors relative">
+      <span
+        key={index}
+        className="mr-3 mb-2 transition-colors relative whitespace-nowrap"
+      >
         {word.split("").map((char, charIdx) => {
           let color = "text-zinc-600";
           if (isPastWord) color = "text-green-500";
@@ -218,6 +236,13 @@ export default function Home() {
         </div>{" "}
         {/* <--- THIS WAS MISSING: Closes the Header Div */}
         {/* RACING BOX */}
+        {sourceText && !isLoading && (
+          <div className="flex justify-end mt-2 opacity-60">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+              Source: {sourceText}
+            </span>
+          </div>
+        )}
         <div className="relative w-full min-h-[160px] text-2xl leading-relaxed font-mono bg-zinc-900 p-8 rounded-2xl border-2 border-zinc-800 shadow-xl overflow-hidden">
           {isLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 backdrop-blur-sm z-10">

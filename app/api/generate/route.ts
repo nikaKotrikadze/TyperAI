@@ -1,4 +1,3 @@
-// src/app/api/generate/route.ts
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 
@@ -10,28 +9,61 @@ export async function POST(req: Request) {
   try {
     const { topic } = await req.json();
 
-    // We build a more "instructional" prompt to handle the language logic
     const prompt = `
-      You are a typing test generator.
-      Topic: ${topic && topic.trim() !== "" ? topic : "a general interesting fact"}.
+      You are a specialized typing test generator. 
+      Topic: ${topic && topic.trim() !== "" ? topic : "General Knowledge"}.
+
+      DECISION LOGIC:
+      1. IF Music/Lyrics: Real lyrics. Source: "Artist - Song".
+      2. IF Poetry: Real verses. Source: "Author - Poem".
+      3. IF Culture/History: Vivid snippet. Source: Specific event/book.
+      4. IF Language/Other: Informative paragraph. Source: Specific subject.
+
+      CONSTRAINTS:
+      - LANGUAGE: Native script only.
+      - SYMBOL SAFETY: Standard keyboard characters only. No curly quotes.
+      - LENGTH: 25 words max.
       
-      CRITICAL RULES:
-      1. If the topic specifies a language (e.g., "Georgian", "French", "Spanish"), you MUST write the paragraph ENTIRELY in that language using its native script.
-      2. For "Georgian", use the Mkhedruli script (ქართული ანბანი).
-      3. Length: Maximum 25 words.
-      4. Content: Engaging, no introductory text, no quotes, just the paragraph itself.
+      OUTPUT FORMAT:
+      [Challenge Text]
+      ###
+      [Specific Source]
     `;
 
-    const { text } = await generateText({
-      model: google("models/gemini-2.5-flash"),
-      prompt: prompt,
-    });
+    // ADDED: Retry and Fallback Logic
+    const callAi = async (modelName: string) => {
+      return await generateText({
+        model: google(modelName),
+        prompt: prompt,
+        // Optional: maxRetries: 2 (The SDK can handle some retries automatically)
+      });
+    };
 
-    return Response.json({ text: text.trim() });
+    let result;
+    try {
+      // Primary attempt with your preferred model
+      result = await callAi("models/gemini-2.5-flash");
+    } catch (e: any) {
+      console.warn("Primary model busy, trying fallback...");
+      // Fallback attempt with the highly stable 1.5-flash
+      result = await callAi("models/gemini-1.5-flash");
+    }
+
+    const parts = result.text.split("###");
+    const challengeText = parts[0]?.trim() || "Error generating text.";
+    const sourceText = parts[1]?.trim() || "TyperAI Archive";
+
+    return Response.json({ text: challengeText, source: sourceText });
   } catch (error: any) {
-    console.error("Detailed Backend Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-    });
+    console.error("Final Backend Error:", error);
+    // If both fail, send a friendly error to the frontend
+    return new Response(
+      JSON.stringify({
+        error:
+          "AI is currently overwhelmed. Please try again in a few seconds.",
+        details: error.message,
+      }),
+      { status: 503 },
+    );
   }
 }

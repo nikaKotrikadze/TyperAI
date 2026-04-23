@@ -6,10 +6,12 @@ import { doc, onSnapshot } from "firebase/firestore";
 interface UserState {
   user: any | null;
   userData: { username: string; bestWpm: number };
-  targetText: string; // New state
+  targetText: string;
+  sourceText?: string;
   loading: boolean;
   initialize: () => void;
   setTargetText: (text: string) => void; // New action
+  setSourceText: (text: string) => void; // New action
   topic: string;
   setTopic: (topic: string) => void;
 }
@@ -18,10 +20,12 @@ export const useUserStore = create<UserState>((set) => ({
   user: null,
   userData: { username: "", bestWpm: 0 },
   targetText: "", // Start empty
+  sourceText: undefined,
   loading: true,
   topic: "",
   setTopic: (topic) => set({ topic }),
   setTargetText: (text) => set({ targetText: text }),
+  setSourceText: (text) => set({ sourceText: text }),
 
   initialize: () => {
     onAuthStateChanged(auth, (currentUser) => {
